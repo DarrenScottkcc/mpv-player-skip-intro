@@ -5,6 +5,7 @@ local msg = require "mp.msg"
 local user_options = {
     skip_chapter = true,
     op_patterns = "OP|[Oo]pening$|^[Oo]pening:|[Oo]pening [Cc]redits",
+	other_patterns = "",
     ed_patterns = "ED|[Ee]nding$|^[Ee]nding:|[Ee]nding [Cc]redits|[Cc]redits"
 }
 
@@ -21,6 +22,7 @@ end
 
 local patterns = {
     op_patterns = split_patterns(user_options.op_patterns),
+    other_patterns = split_patterns(user_options.other_patterns),
     ed_patterns = split_patterns(user_options.ed_patterns)
 }
 
@@ -93,6 +95,13 @@ local function check_chapter(_, chapter)
     for _, p in ipairs(patterns.op_patterns) do
         if chapter:match(p) then
             skip_current("Skipped Intro")
+            return
+        end
+    end
+	
+	for _, p in ipairs(patterns.other_patterns) do
+        if chapter:match(p) then
+            skip_current("Skipped " .. chapter)
             return
         end
     end
