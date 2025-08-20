@@ -5,7 +5,7 @@ local msg = require "mp.msg"
 local user_options = {
     skip_chapter = true,
     op_patterns = "OP|[Oo]pening$|^[Oo]pening:|[Oo]pening [Cc]redits",
-	other_patterns = "",
+    other_patterns = "",
     ed_patterns = "ED|[Ee]nding$|^[Ee]nding:|[Ee]nding [Cc]redits|[Cc]redits"
 }
 
@@ -98,8 +98,8 @@ local function check_chapter(_, chapter)
             return
         end
     end
-	
-	for _, p in ipairs(patterns.other_patterns) do
+
+    for _, p in ipairs(patterns.other_patterns) do
         if chapter:match(p) then
             skip_current("Skipped " .. chapter)
             return
@@ -118,6 +118,8 @@ end
 -- Updates chapter title checking
 ---------------------------------------------------------------------
 local function update_chapter_title()
+    if not user_options.skip_chapter then return end -- respect toggle
+
     local chapter_index = mp.get_property_number("chapter")
     if chapter_index and chapter_index >= 0 then
         local chapters = mp.get_property_native("chapter-list")
@@ -131,31 +133,40 @@ local function update_chapter_title()
 end
 
 ---------------------------------------------------------------------
--- Toggle function for menu / keybinding
+-- Timer + toggle logic
 ---------------------------------------------------------------------
-local function toggle_skip()
-    user_options.skip_chapter = not user_options.skip_chapter
-    prompt_msg("Skip Intro/Outro: " .. (user_options.skip_chapter and "ON" or "OFF"), 1500)
-    msg.info("Skip Intro/Outro is now " .. tostring(user_options.skip_chapter))
+local periodic = mp.add_periodic_timer(10, update_chapter_title)
+if not user_options.skip_chapter then
+    periodic:stop() -- respect initial .conf setting
 end
 
----------------------------------------------------------------------
--- Menu registration (works in script-binding menu)
----------------------------------------------------------------------
-mp.register_script_message("toggle-skip-chapters", toggle_skip)
+local function toggle_skip()
+    user_options.skip_chapter = not user_options.skip_chapter
+    mp.set_property_native("user-data/skip_chapters", user_options.skip_chapter)
+
+    if user_options.skip_chapter then
+        periodic:resume()
+    else
+        periodic:stop()
+    end
+
+    prompt_msg("Skip chapters: " .. (user_options.skip_chapter and "ON" or "OFF"), 1500)
+end
+
+--------------------------------------------------------------------- 
+-- Initialize the property 
+--------------------------------------------------------------------- 
+mp.set_property_native("user-data/skip_chapters", user_options.skip_chapter)
 
 ---------------------------------------------------------------------
--- Keybind (optional)
+-- Menu registration + keybind
 ---------------------------------------------------------------------
+mp.register_script_message("toggle-skip-chapters", toggle_skip)
 mp.add_key_binding("ctrl+w", "toggle-skip-chapters", toggle_skip)
 
 ---------------------------------------------------------------------
--- Activate observer + periodic timer
+-- Always observe chapter property
 ---------------------------------------------------------------------
-if user_options.skip_chapter then
-    mp.observe_property("chapter", "number", function()
-        update_chapter_title()
-    end)
-    -- check every 10s to still skip even if same chapter is long
-    mp.add_periodic_timer(10, update_chapter_title)
-end
+mp.observe_property("chapter", "number", function()
+    update_chapter_title()
+end)
